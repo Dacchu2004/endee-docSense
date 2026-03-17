@@ -1,0 +1,8 @@
+flask
+endee
+sentence-transformers
+PyPDF2
+python-docx
+groq
+python-dotenv
+requests
