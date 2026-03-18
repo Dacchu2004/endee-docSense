@@ -2,18 +2,13 @@ import requests
 from endee import Endee, Precision
 from endee.index import VectorItem
 
-# ── Monkey-patch fix for Endee SDK bug ──────────────────────────────────────
-# VectorItem is a Pydantic model — it has no .get() method, but the SDK
-# internally calls v_item.get("filter", None) which crashes. This adds it.
 if not hasattr(VectorItem, "get"):
     VectorItem.get = lambda self, key, default=None: getattr(self, key, default)
-# ─────────────────────────────────────────────────────────────────────────────
 
 INDEX_NAME = "docsense"
 DIMENSION = 384
 
 client = Endee()
-
 
 def ensure_index():
     """Creates the index if it doesn't exist yet."""
@@ -29,22 +24,37 @@ def ensure_index():
         )
         print(f"[Endee] Index '{INDEX_NAME}' created successfully.")
 
-
 def upsert_chunks(chunks: list):
     """Inserts vectors into Endee using the SDK."""
     index = client.get_index(INDEX_NAME)
     index.upsert(chunks)
     print(f"[Endee] Upserted {len(chunks)} chunks.")
 
-
-def search(query_vector: list, top_k=5) -> list:
-    """Searches Endee for similar vectors."""
+def search(query_vector: list, top_k=5, source_filter: str = None) -> list:
+    """Searches Endee for similar vectors. Scales top_k by indexed file count."""
     index = client.get_index(INDEX_NAME)
+
+    try:
+        from ingestion import load_registry
+        file_count = len(load_registry())
+        scaled_top_k = max(top_k, min(file_count * 4, 20))
+    except:
+        scaled_top_k = top_k
+
     results = index.query(
         vector=query_vector,
-        top_k=top_k,
+        top_k=scaled_top_k,
         ef=128
     )
+
+    #filtering
+    if source_filter:
+        results = [
+            r for r in results
+            if (r.get("meta", {}) if isinstance(r, dict)
+                else getattr(r, "meta", {}) or {}).get("source") == source_filter
+        ]
+
     return results
 
 

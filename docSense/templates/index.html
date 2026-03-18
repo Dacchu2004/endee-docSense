@@ -30,33 +30,46 @@
 
     <!-- Upload Card -->
     <div class="bg-gray-900 rounded-2xl border border-gray-800 p-6">
-      <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider mb-4">① Upload Document</h2>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">① Upload Document</h2>
+        <span id="fileLimit" class="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded-full">0 / 10 files</span>
+      </div>
       <div id="dropZone"
            class="border-2 border-dashed border-gray-700 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-500 transition-colors"
            onclick="document.getElementById('fileInput').click()">
         <div class="text-4xl mb-2">📄</div>
         <p class="text-gray-300 font-medium">Click to upload or drag & drop</p>
-        <p class="text-gray-500 text-sm mt-1">PDF, TXT, DOCX supported</p>
+        <p class="text-gray-500 text-sm mt-1">PDF, TXT, DOCX · Select multiple files at once</p>
       </div>
-      <input type="file" id="fileInput" accept=".pdf,.txt,.docx" class="hidden"/>
-
-      <!-- Upload status -->
+      <input type="file" id="fileInput" accept=".pdf,.txt,.docx" class="hidden" multiple/>
       <div id="uploadStatus" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
-
-      <!-- Upload button -->
-      <button id="uploadBtn"
-              onclick="uploadFile()"
-              class="hidden mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-colors">
+      <button id="uploadBtn" onclick="uploadFile()"
+        class="hidden mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition-colors">
         Upload & Index Document
       </button>
     </div>
 
+    <!-- Indexed Files Card -->
+    <div id="filesCard" class="hidden bg-gray-900 rounded-2xl border border-gray-800 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">② Indexed Documents</h2>
+        <span id="fileCount" class="text-xs text-gray-500"></span>
+      </div>
+      <div id="filesList" class="space-y-2"></div>
+    </div>
+
     <!-- Ask Card -->
     <div class="bg-gray-900 rounded-2xl border border-gray-800 p-6">
-      <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider mb-4">② Ask a Question</h2>
+      <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider mb-1">③ Ask a Question</h2>
+
+      <!-- Active filter indicator -->
+      <div id="filterIndicator" class="hidden mb-3 flex items-center gap-2 text-xs text-indigo-300 bg-indigo-950 border border-indigo-800 rounded-lg px-3 py-2">
+        <span>🔍 Searching in: <strong id="filterName"></strong></span>
+        <button onclick="clearFilter()" class="ml-auto text-gray-400 hover:text-white">✕ Search all</button>
+      </div>
+
       <div class="flex gap-3">
-        <input id="questionInput"
-               type="text"
+        <input id="questionInput" type="text"
                placeholder="Ask anything about your uploaded documents..."
                class="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
                onkeydown="if(event.key==='Enter') askQuestion()"/>
@@ -77,11 +90,12 @@
 
     <!-- Answer Card -->
     <div id="answerCard" class="hidden fade-in bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Answer</h2>
+        <span id="cachedBadge" class="hidden text-xs bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded-full">⚡ Cached</span>
+      </div>
+      <div id="answerText" class="text-gray-100 leading-relaxed text-sm"></div>
 
-      <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Answer</h2>
-      <p id="answerText" class="text-gray-100 leading-relaxed text-sm"></p>
-
-      <!-- Sources -->
       <div id="sourcesSection">
         <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Retrieved Chunks from Endee</h3>
         <div id="sourcesList" class="space-y-2"></div>
@@ -91,9 +105,11 @@
   </main>
 
   <script>
-    let selectedFile = null;
+    let selectedFiles = [];
+    let activeFilter = null;
+    const MAX_FILES = 10;
 
-    // ── Health check on load ──────────────────────────────────────────────────
+    //Health check
     async function checkHealth() {
       try {
         const r = await fetch("/health");
@@ -111,59 +127,199 @@
       }
     }
 
-    // ── File selection ────────────────────────────────────────────────────────
-    document.getElementById("fileInput").addEventListener("change", function () {
-      selectedFile = this.files[0];
-      if (selectedFile) {
-        const dropZone = document.getElementById("dropZone");
-        dropZone.innerHTML = `
-          <div class="text-4xl mb-2">✅</div>
-          <p class="text-indigo-300 font-medium">${selectedFile.name}</p>
-          <p class="text-gray-500 text-sm mt-1">${(selectedFile.size / 1024).toFixed(1)} KB · Ready to upload</p>
-        `;
-        document.getElementById("uploadBtn").classList.remove("hidden");
-        document.getElementById("uploadStatus").classList.add("hidden");
+    //Reset dropzone
+    function resetDropzone() {
+      selectedFiles = [];
+      document.getElementById("fileInput").value = "";
+      document.getElementById("dropZone").innerHTML = `
+        <div class="text-4xl mb-2">📄</div>
+        <p class="text-gray-300 font-medium">Click to upload or drag & drop</p>
+        <p class="text-gray-500 text-sm mt-1">PDF, TXT, DOCX · Select multiple files at once</p>`;
+      document.getElementById("dropZone").onclick = () => document.getElementById("fileInput").click();
+      document.getElementById("dropZone").className = "border-2 border-dashed border-gray-700 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-500 transition-colors";
+      const btn = document.getElementById("uploadBtn");
+      btn.classList.add("hidden");
+      btn.textContent = "Upload & Index Document";
+      btn.disabled = false;
+    }
+
+    //Load indexed files
+    async function loadFiles() {
+      try {
+        const r = await fetch("/files");
+        const d = await r.json();
+        const files = d.files || [];
+        const card = document.getElementById("filesCard");
+        const list = document.getElementById("filesList");
+        const count = document.getElementById("fileCount");
+        const limitEl = document.getElementById("fileLimit");
+
+        //limit counter
+        if (limitEl) {
+          limitEl.textContent = `${files.length} / ${MAX_FILES} files`;
+          limitEl.className = files.length >= MAX_FILES
+            ? "text-xs text-red-400 bg-red-950 px-2 py-1 rounded-full"
+            : "text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded-full";
+        }
+
+        if (files.length === 0) {
+          card.classList.add("hidden");
+          return;
+        }
+
+        card.classList.remove("hidden");
+        count.textContent = `${files.length} file${files.length > 1 ? "s" : ""} indexed`;
+        list.innerHTML = "";
+
+        files.forEach(f => {
+          const isActive = activeFilter === f.filename;
+          list.innerHTML += `
+            <div class="flex items-center justify-between bg-gray-800 rounded-lg px-3 py-2 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="text-gray-300">📄 ${f.filename}</span>
+                <span class="text-gray-600">${f.chunks} chunks</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="setFilter('${f.filename}')"
+                  class="px-2 py-1 rounded-md transition-colors ${isActive ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-indigo-700 hover:text-white'}">
+                  ${isActive ? '✓ Filtering' : 'Filter'}
+                </button>
+                <button onclick="deleteFile('${f.filename}')"
+                  class="px-2 py-1 rounded-md bg-gray-700 text-red-400 hover:bg-red-900 hover:text-red-200 transition-colors">
+                  Delete
+                </button>
+              </div>
+            </div>`;
+        });
+
+        //Disable dropzone
+        if (files.length >= MAX_FILES) {
+          const dropZone = document.getElementById("dropZone");
+          dropZone.onclick = null;
+          dropZone.className = "border-2 border-dashed border-gray-700 rounded-xl p-8 text-center opacity-50 cursor-not-allowed";
+          dropZone.innerHTML = `
+            <div class="text-4xl mb-2">🚫</div>
+            <p class="text-red-400 font-medium">Maximum ${MAX_FILES} files reached</p>
+            <p class="text-gray-500 text-sm mt-1">Delete a file to upload a new one</p>`;
+        }
+
+      } catch (e) {
+        console.error("Failed to load files:", e);
       }
+    }
+
+    //Filter controls
+    function setFilter(filename) {
+      activeFilter = filename;
+      document.getElementById("filterIndicator").classList.remove("hidden");
+      document.getElementById("filterName").textContent = filename;
+      loadFiles();
+    }
+
+    function clearFilter() {
+      activeFilter = null;
+      document.getElementById("filterIndicator").classList.add("hidden");
+      loadFiles();
+    }
+
+    //Delete file
+    async function deleteFile(filename) {
+      if (!confirm(`Delete "${filename}" and all its indexed chunks?`)) return;
+      try {
+        const r = await fetch("/delete-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename })
+        });
+        const d = await r.json();
+        if (r.ok) {
+          if (activeFilter === filename) clearFilter();
+          resetDropzone();
+          loadFiles();
+        } else {
+          alert("Error: " + d.error);
+        }
+      } catch (e) {
+        alert("Delete failed: " + e.message);
+      }
+    }
+
+    //File selection
+    document.getElementById("fileInput").addEventListener("change", function () {
+      const files = Array.from(this.files);
+      if (files.length === 0) return;
+
+      selectedFiles = files;
+      const names = files.map(f => f.name).join(", ");
+      const totalKB = (files.reduce((sum, f) => sum + f.size, 0) / 1024).toFixed(1);
+
+      document.getElementById("dropZone").innerHTML = `
+        <div class="text-4xl mb-2">✅</div>
+        <p class="text-indigo-300 font-medium">${files.length} file${files.length > 1 ? "s" : ""} selected</p>
+        <p class="text-gray-400 text-sm mt-1">${names}</p>
+        <p class="text-gray-500 text-sm">${totalKB} KB total · Ready to upload</p>`;
+
+      const btn = document.getElementById("uploadBtn");
+      btn.textContent = `Upload & Index ${files.length} File${files.length > 1 ? "s" : ""}`;
+      btn.classList.remove("hidden");
+      document.getElementById("uploadStatus").classList.add("hidden");
     });
 
-    // ── Upload file ───────────────────────────────────────────────────────────
+    //Upload files
     async function uploadFile() {
-      if (!selectedFile) return;
+      if (selectedFiles.length === 0) return;
 
       const btn = document.getElementById("uploadBtn");
       const status = document.getElementById("uploadStatus");
 
-      btn.textContent = "Uploading...";
+      btn.textContent = `Uploading 0 / ${selectedFiles.length}...`;
       btn.disabled = true;
+      status.classList.add("hidden");
 
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+      let successCount = 0;
+      let failCount = 0;
+      const errors = [];
 
-      try {
-        const r = await fetch("/ingest", { method: "POST", body: formData });
-        const d = await r.json();
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        btn.textContent = `Uploading ${i + 1} / ${selectedFiles.length}... (${file.name})`;
 
-        status.classList.remove("hidden");
-        if (r.ok) {
-          status.className = "mt-4 p-3 rounded-lg text-sm bg-green-900 text-green-300";
-          status.textContent = `${d.message} · ${d.chunks_stored} chunks indexed into Endee`;
-          btn.textContent = "✅ Indexed!";
-        } else {
-          status.className = "mt-4 p-3 rounded-lg text-sm bg-red-900 text-red-300";
-          status.textContent = "Error: " + d.error;
-          btn.textContent = "Upload & Index Document";
-          btn.disabled = false;
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const r = await fetch("/ingest", { method: "POST", body: formData });
+          const d = await r.json();
+          if (r.ok) {
+            successCount++;
+          } else {
+            failCount++;
+            errors.push(`${file.name}: ${d.error}`);
+          }
+        } catch (e) {
+          failCount++;
+          errors.push(`${file.name}: ${e.message}`);
         }
-      } catch (e) {
-        status.classList.remove("hidden");
-        status.className = "mt-4 p-3 rounded-lg text-sm bg-red-900 text-red-300";
-        status.textContent = "Upload failed: " + e.message;
-        btn.textContent = "Upload & Index Document";
-        btn.disabled = false;
       }
+
+      //Show final result
+      status.classList.remove("hidden");
+      if (failCount === 0) {
+        status.className = "mt-4 p-3 rounded-lg text-sm bg-green-900 text-green-300";
+        status.textContent = `✅ ${successCount} file${successCount > 1 ? "s" : ""} indexed into Endee successfully`;
+      } else if (successCount > 0) {
+        status.className = "mt-4 p-3 rounded-lg text-sm bg-yellow-900 text-yellow-300";
+        status.textContent = `⚠️ ${successCount} succeeded, ${failCount} failed: ${errors.join(" | ")}`;
+      } else {
+        status.className = "mt-4 p-3 rounded-lg text-sm bg-red-900 text-red-300";
+        status.textContent = `❌ All uploads failed: ${errors.join(" | ")}`;
+      }
+
+      loadFiles();
+      resetDropzone();
     }
 
-    // ── Ask question ──────────────────────────────────────────────────────────
+    //Ask question
     async function askQuestion() {
       const input = document.getElementById("questionInput");
       const question = input.value.trim();
@@ -173,22 +329,37 @@
       document.getElementById("answerCard").classList.add("hidden");
 
       try {
+        const body = { question };
+        if (activeFilter) body.source_filter = activeFilter;
+
         const r = await fetch("/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question })
+          body: JSON.stringify(body)
         });
         const d = await r.json();
 
         document.getElementById("loadingDiv").classList.add("hidden");
         document.getElementById("answerCard").classList.remove("hidden");
-        document.getElementById("answerText").textContent = d.answer || d.error;
 
-        // Render sources
+        const cachedBadge = document.getElementById("cachedBadge");
+        d.cached ? cachedBadge.classList.remove("hidden") : cachedBadge.classList.add("hidden");
+
+        document.getElementById("answerText").innerHTML = (d.answer || d.error)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+          .replace(/\*(.*?)\*/g, "<em>$1</em>")
+          .replace(/^(\d+\.\s)/gm, "<br><strong>$1</strong>")
+          .replace(/^[-•]\s/gm, "<br>• ")
+          .replace(/\n/g, "<br>");
+
         const list = document.getElementById("sourcesList");
         list.innerHTML = "";
         if (d.sources && d.sources.length > 0) {
-          d.sources.forEach((s, i) => {
+          document.getElementById("sourcesSection").classList.remove("hidden");
+          d.sources.forEach(s => {
             const pct = Math.round(s.similarity * 100);
             list.innerHTML += `
               <div class="bg-gray-800 rounded-lg p-3 text-xs space-y-1">
@@ -210,8 +381,8 @@
       }
     }
 
-    // Run health check on page load
     checkHealth();
+    loadFiles();
   </script>
 </body>
 </html>
