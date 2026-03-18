@@ -7,16 +7,17 @@ It uses **Endee** as the vector database for semantic retrieval,
 
 ```
 
+</pre>
+
 **Document Ingestion Flow:**
-```
 
+<pre>
 File Upload ──► Text Extraction (PyPDF2 / python-docx)
-──► Dynamic Chunking (size adapts to doc length)
-──► Batch Embedding (sentence-transformers)
-──► Upsert into Endee (id, vector, metadata)
-──► Registry update (ingested_files.json)
-
-````
+    ──► Dynamic Chunking (size adapts to doc length)
+    ──► Batch Embedding (sentence-transformers)
+    ──► Upsert into Endee (id, vector, metadata)
+    ──► Registry update (ingested_files.json)
+</pre>
 
 ---
 
@@ -68,11 +69,13 @@ File Upload ──► Text Extraction (PyPDF2 / python-docx)
 - Groq API key — free at https://console.groq.com
 
 ### 1. Star and Fork the Endee Repository
-```bash
-# Star: https://github.com/endee-io/endee
-# Fork to your GitHub account, then clone your fork:
+
+- Go to [https://github.com/endee-io/endee](https://github.com/endee-io/endee) → click ⭐ Star
+- Click Fork → fork to your GitHub account
+- Clone your fork:
+````bash
 git clone https://github.com/YOUR_USERNAME/endee.git
-cd endee
+cd endee/docSense
 ````
 
 ### 2. Start Endee Vector Database
@@ -141,7 +144,7 @@ Open **http://localhost:5000** in your browser.
 
 ## Project Structure
 
-```
+<pre>
 docSense/
 ├── app.py              # Flask API — all routes
 ├── endee_client.py     # Endee SDK wrapper — index, upsert, search
@@ -154,8 +157,7 @@ docSense/
 ├── requirements.txt
 ├── .env.example
 └── ingested_files.json # Auto-generated file registry
-```
-
+</pre>
 ---
 
 ## Performance Optimizations
