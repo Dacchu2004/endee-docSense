@@ -2,22 +2,17 @@
 
 DocSense is a production-grade Retrieval-Augmented Generation (RAG) application
 that lets users upload documents (PDF, DOCX, TXT) and ask natural language questions.
-It uses **Endee** as the vector database for semantic retrieval,
+It uses **Endee** as the vector database for semantic retrieval, 
 **sentence-transformers** for embeddings, and **Groq LLaMA 3** for answer generation.
 
-```
-
-</pre>
-
 **Document Ingestion Flow:**
-
-<pre>
+```
 File Upload ──► Text Extraction (PyPDF2 / python-docx)
     ──► Dynamic Chunking (size adapts to doc length)
     ──► Batch Embedding (sentence-transformers)
     ──► Upsert into Endee (id, vector, metadata)
     ──► Registry update (ingested_files.json)
-</pre>
+```
 
 ---
 
@@ -69,17 +64,14 @@ File Upload ──► Text Extraction (PyPDF2 / python-docx)
 - Groq API key — free at https://console.groq.com
 
 ### 1. Star and Fork the Endee Repository
-
-- Go to [https://github.com/endee-io/endee](https://github.com/endee-io/endee) → click ⭐ Star
-- Click Fork → fork to your GitHub account
-- Clone your fork:
-````bash
+```bash
+# Star: https://github.com/endee-io/endee
+# Fork to your GitHub account, then clone your fork:
 git clone https://github.com/YOUR_USERNAME/endee.git
-cd endee/docSense
-````
+cd endee
+```
 
 ### 2. Start Endee Vector Database
-
 ```bash
 cd docSense
 docker compose up -d
@@ -90,7 +82,6 @@ docker ps
 ```
 
 ### 3. Install Python Dependencies
-
 ```bash
 python -m venv venv
 
@@ -103,14 +94,12 @@ pip install -r requirements.txt
 ```
 
 ### 4. Configure Environment
-
 ```bash
 # Create .env file:
 echo GROQ_API_KEY=your_groq_api_key_here > .env
 ```
 
 ### 5. Run the Application
-
 ```bash
 python app.py
 ```
@@ -131,20 +120,19 @@ Open **http://localhost:5000** in your browser.
 
 ## API Endpoints
 
-| Method | Endpoint       | Description                              |
-| ------ | -------------- | ---------------------------------------- |
-| `GET`  | `/`            | Serves the web UI                        |
-| `GET`  | `/health`      | Health check — Flask + Endee status      |
-| `GET`  | `/files`       | List all indexed files with chunk counts |
-| `POST` | `/ingest`      | Upload and index a document              |
-| `POST` | `/ask`         | Ask a question (RAG pipeline)            |
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/` | Serves the web UI |
+| `GET` | `/health` | Health check — Flask + Endee status |
+| `GET` | `/files` | List all indexed files with chunk counts |
+| `POST` | `/ingest` | Upload and index a document |
+| `POST` | `/ask` | Ask a question (RAG pipeline) |
 | `POST` | `/delete-file` | Delete a file and its vectors from Endee |
 
 ---
 
 ## Project Structure
-
-<pre>
+```
 docSense/
 ├── app.py              # Flask API — all routes
 ├── endee_client.py     # Endee SDK wrapper — index, upsert, search
@@ -157,7 +145,8 @@ docSense/
 ├── requirements.txt
 ├── .env.example
 └── ingested_files.json # Auto-generated file registry
-</pre>
+```
+
 ---
 
 ## Performance Optimizations
@@ -172,6 +161,6 @@ docSense/
 
 ## Environment Variables
 
-| Variable       | Description              | Required |
-| -------------- | ------------------------ | -------- |
-| `GROQ_API_KEY` | Groq API key for LLaMA 3 | Yes      |
+| Variable | Description | Required |
+|---|---|---|
+| `GROQ_API_KEY` | Groq API key for LLaMA 3 | Yes |
