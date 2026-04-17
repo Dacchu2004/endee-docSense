@@ -1,6 +1,6 @@
 # DocSense — RAG-Powered Document Q&A using Endee Vector Database
 
-DocSense is a production-grade Retrieval-Augmented Generation (RAG) application
+DocSense is a functional Retrieval-Augmented Generation (RAG) demo application
 that lets users upload documents (PDF, DOCX, TXT) and ask natural language questions.
 It uses **Endee** as the vector database for semantic retrieval, 
 **sentence-transformers** for embeddings, and **Groq LLaMA 3** for answer generation.
@@ -35,7 +35,7 @@ File Upload ──► Text Extraction (PyPDF2 / python-docx)
 - **Semantic search** — Vector similarity via Endee, not keyword matching
 - **Dynamic chunking** — Chunk size adapts to document length (resumes vs 100-page reports)
 - **Duplicate prevention** — Re-uploading same file auto-replaces old chunks
-- **In-memory query cache** — MD5-keyed cache eliminates redundant LLM calls
+- **In-memory query cache** — MD5-keyed FIFO cache eliminates redundant LLM calls
 - **Model pre-warming** — Embedding model loaded at startup, not on first request
 - **Per-file filtering** — Ask questions scoped to a single document
 - **File management** — View, filter, and delete indexed documents from UI
@@ -152,10 +152,20 @@ docSense/
 ## Performance Optimizations
 
 - **Startup pre-warming** — Embedding model loaded once at startup, eliminating cold-start latency on first request
-- **In-memory LRU cache** — MD5-hashed query cache (max 50 entries) returns repeated questions instantly without re-embedding or LLM calls
+- **In-memory FIFO cache** — MD5-hashed query cache (max 50 entries) returns repeated questions instantly without re-embedding or LLM calls. Evicts oldest-inserted entry when full.
 - **Batch embedding** — All chunks of a document are embedded in a single model call
 - **Dynamic chunk sizing** — Smaller chunks for large documents improve retrieval precision; larger chunks for short documents preserve context
 - **Scaled top-k retrieval** — Retrieval count scales with indexed file count ensuring all documents get fair representation
+
+---
+
+## Known Limitations
+
+- **Single-worker dev server** — `app.py` runs with Flask's built-in server; production deployment would use gunicorn behind nginx
+- **JSON file registry** — Not concurrency-safe under multi-worker setups; SQLite or Endee metadata would be the production fix
+- **Character-based chunking** — Does not respect token or sentence boundaries; a chunk exceeding 512 tokens will be silently truncated by the embedding model
+- **Client-side source filtering** — Endee supports server-side payload filters natively, which would be more efficient at scale
+- **No automated tests or evaluation harness** — Retrieval quality is not benchmarked; recall@k and RAGAs metrics would be the next step
 
 ---
 
